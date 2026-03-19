@@ -1,0 +1,7 @@
+credentials/
+tokens/
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
