@@ -42,6 +42,18 @@ def print_result(action: str, count: int) -> None:
         console.print(f"[dim]{action}: 처리할 항목 없음[/]")
 
 
+def print_auto_label_table(label_counts: dict[str, int]) -> None:
+    table = Table(title="자동 라벨 분류 결과", show_lines=True)
+    table.add_column("라벨", style="cyan")
+    table.add_column("건수", style="yellow", justify="right")
+
+    for label, count in label_counts.items():
+        if count > 0:
+            table.add_row(label, f"{count:,}")
+
+    console.print(table)
+
+
 def print_large_mail_table(messages: list[dict]) -> None:
     table = Table(title="대용량 메일 목록", show_lines=True)
     table.add_column("#", style="dim", width=4)

@@ -12,6 +12,7 @@ from cleaner.sender import SenderCleaner
 from cleaner.old_mail import OldMailCleaner
 from cleaner.large_mail import LargeMailCleaner
 from cleaner.label import LabelCleaner
+from cleaner.auto_label import AutoLabelCleaner
 from ui.console import (
     console,
     print_header,
@@ -22,17 +23,19 @@ from ui.console import (
     print_count,
     print_result,
     print_large_mail_table,
+    print_auto_label_table,
 )
 from ui.progress import progress_bar
 from ui import menu
 
 
-def flow_spam_promo(service) -> None:
-    available = get_available_categories()
-    categories = menu.select_categories(available)
-    if not categories:
-        print_warning("선택된 카테고리 없음")
-        return
+def flow_spam_promo(service, *, categories: list[str] | None = None) -> None:
+    if categories is None:
+        available = get_available_categories()
+        categories = menu.select_categories(available)
+        if not categories:
+            print_warning("선택된 카테고리 없음")
+            return
 
     cleaner = SpamPromoCleaner(service, categories)
     print_info("대상 메일 수 확인 중...")
@@ -61,10 +64,11 @@ def flow_unread(service) -> None:
     print_result("읽음 처리", done)
 
 
-def flow_sender(service) -> None:
-    sender = menu.input_sender_email()
-    if not sender:
-        return
+def flow_sender(service, *, sender: str | None = None) -> None:
+    if sender is None:
+        sender = menu.input_sender_email()
+        if not sender:
+            return
 
     cleaner = SenderCleaner(service, sender)
     print_info(f"'{sender}' 발신 메일 수 확인 중...")
@@ -79,10 +83,11 @@ def flow_sender(service) -> None:
     print_result("삭제", deleted)
 
 
-def flow_old_mail(service) -> None:
-    days = menu.input_days()
-    if not days:
-        return
+def flow_old_mail(service, *, days: int | None = None) -> None:
+    if days is None:
+        days = menu.input_days()
+        if not days:
+            return
 
     cleaner = OldMailCleaner(service, days)
     print_info(f"{days}일 이상 오래된 메일 수 확인 중...")
@@ -160,6 +165,43 @@ def flow_label(service) -> None:
     print_result(action, done)
 
 
+def flow_auto_label(service, **_) -> None:
+    cleaner = AutoLabelCleaner(service)
+    print_info("받은편지함 메시지 ID 수집 중...")
+    msg_ids = cleaner.fetch_message_ids()
+    print_count("분석 대상", len(msg_ids))
+
+    if not msg_ids:
+        return
+
+    with progress_bar("분석 중", total=len(msg_ids)) as update:
+        classified = cleaner.analyze(msg_ids, progress_callback=update)
+
+    label_counts = {label: len(ids) for label, ids in classified.items()}
+    matched = {k: v for k, v in label_counts.items() if v > 0}
+
+    if not matched:
+        print_warning("분류된 메일이 없습니다.")
+        return
+
+    print_auto_label_table(matched)
+    selected_labels = menu.select_labels_for_apply(matched)
+
+    if not selected_labels:
+        print_warning("선택된 라벨 없음")
+        return
+
+    total_count = sum(len(classified[l]) for l in selected_labels)
+    if not menu.confirm(f"{total_count:,}건에 라벨을 적용할까요?"):
+        return
+
+    with progress_bar("라벨 적용 중", total=len(selected_labels)) as update:
+        results = cleaner.execute(classified, selected_labels, progress_callback=update)
+
+    for label_name, count in results.items():
+        print_result(f"[{label_name}] 라벨 적용", count)
+
+
 TASK_FLOWS = {
     "스팸/프로모션/소셜/업데이트/휴지통 비우기": flow_spam_promo,
     "읽지 않은 메일 전체 읽음 처리": flow_unread,
@@ -167,7 +209,51 @@ TASK_FLOWS = {
     "N일 이상 오래된 메일 삭제": flow_old_mail,
     "N MB 이상 대용량 메일 삭제": flow_large_mail,
     "라벨 기준 정리": flow_label,
+    "자동 라벨 분류": flow_auto_label,
 }
+
+
+def collect_bulk_params(task: str) -> dict | None:
+    """일괄 작업용 파라미터 수집. None이면 취소."""
+    if task == "스팸/프로모션/소셜/업데이트/휴지통 비우기":
+        categories = menu.select_categories(get_available_categories())
+        return {"categories": categories} if categories else None
+    elif task == "읽지 않은 메일 전체 읽음 처리":
+        return {}
+    elif task == "특정 발신자 메일 삭제":
+        sender = menu.input_sender_email()
+        return {"sender": sender} if sender else None
+    elif task == "N일 이상 오래된 메일 삭제":
+        days = menu.input_days()
+        return {"days": days} if days else None
+    return None
+
+
+def run_bulk_mode(accounts: list[str]) -> None:
+    """전체 계정 일괄 작업 모드: 작업 선택 → 파라미터 수집 → 계정 선택 → 순차 실행"""
+    task = menu.select_task_bulk()
+    if not task:
+        return
+
+    params = collect_bulk_params(task)
+    if params is None:
+        print_warning("입력 취소됨")
+        return
+
+    selected_accounts = menu.select_accounts_checkbox(accounts)
+    if not selected_accounts:
+        print_warning("선택된 계정 없음")
+        return
+
+    flow_fn = TASK_FLOWS[task]
+    for email in selected_accounts:
+        print_header(f"Gmail Cleaner — {email}")
+        try:
+            service = authenticate(email)
+            flow_fn(service, **params)
+        except Exception as e:
+            print_error(f"[{email}] 오류: {e}")
+        console.print()
 
 
 def run_account_session(service, email: str) -> bool:
@@ -205,6 +291,10 @@ def main() -> None:
         if not account_choice or account_choice == "종료":
             print_info("종료합니다.")
             break
+
+        if account_choice == "⚡ 전체 계정 일괄 작업":
+            run_bulk_mode(accounts)
+            continue
 
         try:
             if account_choice == "+ 새 계정 추가":

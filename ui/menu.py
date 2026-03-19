@@ -19,6 +19,7 @@ TASK_CHOICES = [
     "N일 이상 오래된 메일 삭제",
     "N MB 이상 대용량 메일 삭제",
     "라벨 기준 정리",
+    "자동 라벨 분류",
     "─────────────────",
     "다른 계정으로 전환",
     "종료",
@@ -27,13 +28,46 @@ TASK_CHOICES = [
 
 def select_account(accounts: list[str]) -> str | None:
     """인증된 계정 중 선택 또는 새 계정 추가"""
-    choices = accounts + ["+ 새 계정 추가", "종료"]
+    choices = []
+    if accounts:
+        choices.append("⚡ 전체 계정 일괄 작업")
+    choices += accounts + ["+ 새 계정 추가", "종료"]
     answer = questionary.select(
         "Gmail 계정을 선택하세요:",
         choices=choices,
         style=MENU_STYLE,
     ).ask()
     return answer
+
+
+BULK_TASK_CHOICES = [
+    "스팸/프로모션/소셜/업데이트/휴지통 비우기",
+    "읽지 않은 메일 전체 읽음 처리",
+    "특정 발신자 메일 삭제",
+    "N일 이상 오래된 메일 삭제",
+    "취소",
+]
+
+
+def select_task_bulk() -> str | None:
+    """일괄 작업용 작업 선택"""
+    answer = questionary.select(
+        "일괄 적용할 작업을 선택하세요:",
+        choices=BULK_TASK_CHOICES,
+        style=MENU_STYLE,
+    ).ask()
+    return None if answer == "취소" else answer
+
+
+def select_accounts_checkbox(accounts: list[str]) -> list[str]:
+    """일괄 적용할 계정 다중 선택"""
+    choices = [{"name": a, "value": a, "checked": True} for a in accounts]
+    selected = questionary.checkbox(
+        "적용할 계정을 선택하세요 (스페이스바로 선택/해제):",
+        choices=choices,
+        style=MENU_STYLE,
+    ).ask()
+    return selected or []
 
 
 def select_task() -> str | None:
@@ -119,6 +153,27 @@ def select_label_action() -> str | None:
         choices=["삭제", "아카이브", "읽음 처리"],
         style=MENU_STYLE,
     ).ask()
+
+
+def select_labels_for_apply(label_counts: dict[str, int]) -> list[str]:
+    """라벨 분류 결과에서 적용할 라벨 다중 선택."""
+    choices = [
+        {
+            "name": f"{label} ({count:,}건)",
+            "value": label,
+            "checked": True,
+        }
+        for label, count in label_counts.items()
+        if count > 0
+    ]
+    if not choices:
+        return []
+    selected = questionary.checkbox(
+        "적용할 라벨을 선택하세요 (스페이스바로 선택/해제):",
+        choices=choices,
+        style=MENU_STYLE,
+    ).ask()
+    return selected or []
 
 
 def confirm(message: str) -> bool:
