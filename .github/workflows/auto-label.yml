@@ -32,8 +32,10 @@ jobs:
           echo "${{ secrets.GMAIL_TOKENS_BUNDLE_B64 }}" | base64 -d | tar xzf -
 
       - name: 자동 라벨 분류 실행
+        env:
+          GMAIL_EMAILS: ${{ secrets.GMAIL_EMAILS }}
         run: |
-          for email in $(echo "${{ secrets.GMAIL_EMAILS }}" | tr ',' '\n'); do
+          for email in $(echo "$GMAIL_EMAILS" | tr ',' '\n'); do
             echo "=== $email ==="
             python3 main.py --headless --task auto-label --email "$email"
           done

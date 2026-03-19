@@ -36,23 +36,13 @@ jobs:
         run: |
           echo "${{ secrets.GMAIL_TOKENS_BUNDLE_B64 }}" | base64 -d | tar xzf -
 
-      - name: 삭제 대상 카테고리 결정
-        id: categories
-        run: |
-          # workflow_dispatch 입력값 우선, 없으면 Secret 사용
-          CATS="${{ github.event.inputs.categories }}"
-          if [ -z "$CATS" ]; then
-            CATS="${{ secrets.CLEANUP_CATEGORIES }}"
-          fi
-          if [ -z "$CATS" ]; then
-            CATS="spam promotions"
-          fi
-          echo "value=$CATS" >> $GITHUB_OUTPUT
-
       - name: 불필요한 메일 삭제 실행
+        env:
+          GMAIL_EMAILS: ${{ secrets.GMAIL_EMAILS }}
+          CLEANUP_CATS: ${{ github.event.inputs.categories || secrets.CLEANUP_CATEGORIES || 'spam promotions' }}
         run: |
-          for email in $(echo "${{ secrets.GMAIL_EMAILS }}" | tr ',' '\n'); do
+          for email in $(echo "$GMAIL_EMAILS" | tr ',' '\n'); do
             echo "=== $email ==="
             python3 main.py --headless --task cleanup --email "$email" \
-              --categories ${{ steps.categories.outputs.value }}
+              --categories $CLEANUP_CATS
           done
