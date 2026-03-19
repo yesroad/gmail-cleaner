@@ -33,8 +33,7 @@ jobs:
 
       - name: 자동 라벨 분류 실행
         run: |
-          IFS=',' read -ra EMAILS <<< "${{ secrets.GMAIL_EMAILS }}"
-          for email in "${EMAILS[@]}"; do
+          for email in $(echo "${{ secrets.GMAIL_EMAILS }}" | tr ',' '\n'); do
             echo "=== $email ==="
             python3 main.py --headless --task auto-label --email "$email"
           done

@@ -51,8 +51,7 @@ jobs:
 
       - name: 불필요한 메일 삭제 실행
         run: |
-          IFS=',' read -ra EMAILS <<< "${{ secrets.GMAIL_EMAILS }}"
-          for email in "${EMAILS[@]}"; do
+          for email in $(echo "${{ secrets.GMAIL_EMAILS }}" | tr ',' '\n'); do
             echo "=== $email ==="
             python3 main.py --headless --task cleanup --email "$email" \
               --categories ${{ steps.categories.outputs.value }}
