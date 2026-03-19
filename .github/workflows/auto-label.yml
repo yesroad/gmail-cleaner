@@ -1,0 +1,40 @@
+name: 자동 라벨 분류 (3일마다)
+
+on:
+  schedule:
+    - cron: "0 2 */3 * *"   # 3일마다 UTC 02:00 (한국 11:00)
+  workflow_dispatch:          # 수동 실행 버튼
+
+jobs:
+  auto-label:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: credentials 복원
+        run: |
+          mkdir -p credentials
+          echo "${{ secrets.GMAIL_CREDENTIALS_B64 }}" | base64 -d > credentials/credentials.json
+
+      - name: 토큰 번들 복원
+        run: |
+          echo "${{ secrets.GMAIL_TOKENS_BUNDLE_B64 }}" | base64 -d | tar xzf -
+
+      - name: 자동 라벨 분류 실행
+        run: |
+          IFS=',' read -ra EMAILS <<< "${{ secrets.GMAIL_EMAILS }}"
+          for email in "${EMAILS[@]}"; do
+            echo "=== $email ==="
+            python3 main.py --headless --task auto-label --email "$email"
+          done

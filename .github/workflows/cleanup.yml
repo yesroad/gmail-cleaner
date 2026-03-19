@@ -1,0 +1,59 @@
+name: 불필요한 메일 삭제 (매주)
+
+on:
+  schedule:
+    - cron: "0 2 * * 0"   # 매주 일요일 UTC 02:00 (한국 11:00)
+  workflow_dispatch:
+    inputs:
+      categories:
+        description: "삭제할 카테고리 (공백 구분): 스팸+(SPAM) 프로모션 소셜 업데이트 휴지통+(TRASH)"
+        required: false
+        default: "스팸+(SPAM) 프로모션"
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: credentials 복원
+        run: |
+          mkdir -p credentials
+          echo "${{ secrets.GMAIL_CREDENTIALS_B64 }}" | base64 -d > credentials/credentials.json
+
+      - name: 토큰 번들 복원
+        run: |
+          echo "${{ secrets.GMAIL_TOKENS_BUNDLE_B64 }}" | base64 -d | tar xzf -
+
+      - name: 삭제 대상 카테고리 결정
+        id: categories
+        run: |
+          # workflow_dispatch 입력값 우선, 없으면 Secret 사용
+          CATS="${{ github.event.inputs.categories }}"
+          if [ -z "$CATS" ]; then
+            CATS="${{ secrets.CLEANUP_CATEGORIES }}"
+          fi
+          if [ -z "$CATS" ]; then
+            CATS="스팸 (SPAM) 프로모션"
+          fi
+          echo "value=$CATS" >> $GITHUB_OUTPUT
+
+      - name: 불필요한 메일 삭제 실행
+        run: |
+          IFS=',' read -ra EMAILS <<< "${{ secrets.GMAIL_EMAILS }}"
+          for email in "${EMAILS[@]}"; do
+            echo "=== $email ==="
+            python3 main.py --headless --task cleanup --email "$email" \
+              --categories ${{ steps.categories.outputs.value }}
+          done

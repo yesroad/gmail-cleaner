@@ -9,8 +9,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 SCOPES = [
-    "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://mail.google.com/",
 ]
 
 CREDENTIALS_DIR = Path("credentials")
@@ -117,7 +116,7 @@ def list_authenticated_accounts() -> list[str]:
 
     accounts = []
     for token_path in TOKENS_DIR.glob("token_*.json"):
-        if token_path.stem == "token_temp":
+        if token_path.stem == "token_temp" or token_path.stem.endswith(".meta"):
             continue
         meta_path = get_meta_path(token_path)
         if meta_path.exists():

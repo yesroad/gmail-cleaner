@@ -1,5 +1,6 @@
 """받은편지함 자동 라벨 분류기"""
 
+import re
 from typing import Callable
 
 from utils.batch import collect_message_ids, batch_modify
@@ -57,6 +58,34 @@ LABEL_RULES: list[dict] = [
 ]
 
 MAX_ANALYZE_RESULTS = 500
+
+# 도메인 fallback에서 제외할 개인용 이메일 도메인
+PERSONAL_DOMAINS: frozenset[str] = frozenset([
+    "gmail.com", "googlemail.com",
+    "naver.com", "daum.net", "hanmail.net", "kakao.com",
+    "hotmail.com", "outlook.com", "live.com",
+    "yahoo.com", "yahoo.co.kr",
+    "icloud.com", "me.com",
+])
+
+DOMAIN_LABEL_PREFIX = "도메인"
+
+
+def _extract_domain(sender: str) -> str | None:
+    """From 헤더에서 도메인을 추출한다. 개인 도메인은 None 반환.
+
+    'Name <user@domain.com>' 및 'user@domain.com' 형식을 모두 처리한다.
+    """
+    match = re.search(r"<[^@]+@([^>]+)>", sender)
+    if not match:
+        match = re.search(r"[^@\s]+@([^\s>]+)", sender)
+    if not match:
+        return None
+
+    domain = match.group(1).lower().rstrip(".")
+    if domain in PERSONAL_DOMAINS:
+        return None
+    return domain
 
 
 def _match_rule(
@@ -136,10 +165,20 @@ class AutoLabelCleaner:
             subject = headers.get("Subject", "")
             label_ids = msg.get("labelIds", [])
 
+            matched = False
             for rule in LABEL_RULES:
                 if _match_rule(rule, label_ids, sender, subject):
                     classified[rule["label"]].append(msg_id)
+                    matched = True
                     break  # 첫 번째 매칭 규칙만 적용
+
+            if not matched:
+                domain = _extract_domain(sender)
+                if domain:
+                    label_key = f"{DOMAIN_LABEL_PREFIX}/{domain}"
+                    if label_key not in classified:
+                        classified[label_key] = []
+                    classified[label_key].append(msg_id)
 
             if progress_callback:
                 progress_callback(i + 1, total)

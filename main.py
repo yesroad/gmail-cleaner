@@ -1,5 +1,6 @@
 """Gmail Cleaner 진입점"""
 
+import argparse
 import sys
 from auth import (
     authenticate,
@@ -226,6 +227,8 @@ def collect_bulk_params(task: str) -> dict | None:
     elif task == "N일 이상 오래된 메일 삭제":
         days = menu.input_days()
         return {"days": days} if days else None
+    elif task == "자동 라벨 분류":
+        return {}
     return None
 
 
@@ -319,9 +322,92 @@ def main() -> None:
             break
 
 
-if __name__ == "__main__":
+def headless_auto_label(service) -> None:
+    """비대화형 자동 라벨 분류 — 모든 매칭 라벨 자동 적용"""
+    cleaner = AutoLabelCleaner(service)
+    print_info("받은편지함 메시지 ID 수집 중...")
+    msg_ids = cleaner.fetch_message_ids()
+    print_count("분석 대상", len(msg_ids))
+
+    if not msg_ids:
+        return
+
+    with progress_bar("분석 중", total=len(msg_ids)) as update:
+        classified = cleaner.analyze(msg_ids, progress_callback=update)
+
+    label_counts = {label: len(ids) for label, ids in classified.items()}
+    matched = {k: v for k, v in label_counts.items() if v > 0}
+
+    if not matched:
+        print_warning("분류된 메일이 없습니다.")
+        return
+
+    print_auto_label_table(matched)
+    selected_labels = list(matched.keys())
+
+    with progress_bar("라벨 적용 중", total=len(selected_labels)) as update:
+        results = cleaner.execute(classified, selected_labels, progress_callback=update)
+
+    for label_name, count in results.items():
+        print_result(f"[{label_name}] 라벨 적용", count)
+
+
+def headless_cleanup(service, categories: list[str]) -> None:
+    """비대화형 스팸/프로모션 삭제"""
+    cleaner = SpamPromoCleaner(service, categories)
+    print_info("대상 메일 수 확인 중...")
+    count = cleaner.preview()
+    print_count("삭제 대상", count)
+
+    if count == 0:
+        return
+
+    with progress_bar("삭제 중", total=count) as update:
+        deleted = cleaner.execute(progress_callback=update)
+    print_result("삭제", deleted)
+
+
+def run_headless(email: str, task: str, categories: list[str]) -> None:
+    """GitHub Actions 등 비대화형 환경 진입점"""
+    print_header(f"Gmail Cleaner [headless] — {email}")
     try:
-        main()
-    except KeyboardInterrupt:
-        print("\n종료합니다.")
-        sys.exit(0)
+        service = authenticate(email)
+        print_success(f"인증 완료: {email}")
+    except Exception as e:
+        print_error(f"인증 실패: {e}")
+        sys.exit(1)
+
+    try:
+        if task == "auto-label":
+            headless_auto_label(service)
+        elif task == "cleanup":
+            headless_cleanup(service, categories)
+    except Exception as e:
+        print_error(f"작업 실패: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Gmail Cleaner")
+    parser.add_argument("--headless", action="store_true", help="비대화형 모드")
+    parser.add_argument("--task", choices=["auto-label", "cleanup"], help="실행할 작업")
+    parser.add_argument("--email", help="Gmail 계정")
+    parser.add_argument(
+        "--categories",
+        nargs="+",
+        default=["스팸 (SPAM)", "프로모션"],
+        help="삭제할 카테고리 (cleanup 전용): '스팸 (SPAM)' '프로모션' '소셜' '업데이트' '휴지통 (TRASH)'",
+    )
+    args = parser.parse_args()
+
+    if args.headless:
+        if not args.email or not args.task:
+            print("--headless 모드에는 --email과 --task가 필요합니다.")
+            sys.exit(1)
+        run_headless(args.email, args.task, args.categories)
+    else:
+        try:
+            main()
+        except KeyboardInterrupt:
+            print("\n종료합니다.")
+            sys.exit(0)
