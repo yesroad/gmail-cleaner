@@ -53,8 +53,8 @@ if [ -d "tokens" ]; then
 fi
 
 echo "[4] Secret 이름: CLEANUP_CATEGORIES (선택사항)"
-echo "    기본값: 스팸 (SPAM) 프로모션"
-echo "    선택 가능: '스팸 (SPAM)' '프로모션' '소셜' '업데이트' '휴지통 (TRASH)'"
+echo "    기본값: spam promotions"
+echo "    선택 가능: spam promotions social updates trash"
 echo ""
 echo "========================================"
 echo "  설정 위치: GitHub 저장소 → Settings → Secrets and variables → Actions"

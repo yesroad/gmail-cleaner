@@ -387,6 +387,15 @@ def run_headless(email: str, task: str, categories: list[str]) -> None:
         sys.exit(1)
 
 
+CATEGORY_ALIASES: dict[str, str] = {
+    "spam":       "스팸 (SPAM)",
+    "promotions": "프로모션",
+    "social":     "소셜",
+    "updates":    "업데이트",
+    "trash":      "휴지통 (TRASH)",
+}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gmail Cleaner")
     parser.add_argument("--headless", action="store_true", help="비대화형 모드")
@@ -395,8 +404,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--categories",
         nargs="+",
-        default=["스팸 (SPAM)", "프로모션"],
-        help="삭제할 카테고리 (cleanup 전용): '스팸 (SPAM)' '프로모션' '소셜' '업데이트' '휴지통 (TRASH)'",
+        default=["spam", "promotions"],
+        help="삭제할 카테고리 (cleanup 전용): spam promotions social updates trash",
     )
     args = parser.parse_args()
 
@@ -404,7 +413,8 @@ if __name__ == "__main__":
         if not args.email or not args.task:
             print("--headless 모드에는 --email과 --task가 필요합니다.")
             sys.exit(1)
-        run_headless(args.email, args.task, args.categories)
+        resolved = [CATEGORY_ALIASES.get(c, c) for c in args.categories]
+        run_headless(args.email, args.task, resolved)
     else:
         try:
             main()

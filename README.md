@@ -89,7 +89,7 @@ bash scripts/export_secrets.sh
 | `GMAIL_CREDENTIALS_B64` | `credentials.json` base64 인코딩 값 |
 | `GMAIL_TOKENS_BUNDLE_B64` | `tokens/` 디렉토리 tar.gz base64 인코딩 값 |
 | `GMAIL_EMAILS` | Gmail 주소 (여러 개면 콤마로 구분: `a@gmail.com,b@gmail.com`) |
-| `CLEANUP_CATEGORIES` | (선택) 삭제 대상 카테고리, 기본값: `스팸 (SPAM) 프로모션` |
+| `CLEANUP_CATEGORIES` | (선택) 삭제 대상 카테고리, 기본값: `spam promotions` / 선택 가능: `spam promotions social updates trash` |
 
 **4단계 — 수동 테스트**
 
@@ -144,7 +144,7 @@ python3 main.py --headless --task cleanup --email user@gmail.com
 
 # 삭제 카테고리 직접 지정
 python3 main.py --headless --task cleanup --email user@gmail.com \
-  --categories "스팸 (SPAM)" "프로모션" "소셜"
+  --categories spam promotions social
 ```
 
 ---

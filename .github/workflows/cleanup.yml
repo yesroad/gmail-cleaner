@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       categories:
-        description: "삭제할 카테고리 (공백 구분): 스팸+(SPAM) 프로모션 소셜 업데이트 휴지통+(TRASH)"
+        description: "삭제할 카테고리 (공백 구분): spam promotions social updates trash"
         required: false
-        default: "스팸+(SPAM) 프로모션"
+        default: "spam promotions"
 
 jobs:
   cleanup:
@@ -45,7 +45,7 @@ jobs:
             CATS="${{ secrets.CLEANUP_CATEGORIES }}"
           fi
           if [ -z "$CATS" ]; then
-            CATS="스팸 (SPAM) 프로모션"
+            CATS="spam promotions"
           fi
           echo "value=$CATS" >> $GITHUB_OUTPUT
 
