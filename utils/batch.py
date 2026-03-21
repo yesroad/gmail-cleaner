@@ -1,9 +1,34 @@
 """Gmail API 페이지네이션 + 일괄 처리 유틸"""
 
+from __future__ import annotations
+
+import time
 from typing import Callable
+
+from googleapiclient.errors import HttpError
 
 MAX_LIST_RESULTS = 500
 BATCH_CHUNK_SIZE = 1000
+
+# 레이트 리밋(403/429) 발생 시 재시도 대기 시간 (초)
+_BACKOFF_DELAYS: tuple[int, ...] = (1, 2, 4, 8, 16)
+
+
+def execute_with_backoff(request: object) -> dict:
+    """레이트 리밋 응답 시 지수 백오프로 최대 5회 재시도한다."""
+    for delay in (0, *_BACKOFF_DELAYS):
+        if delay:
+            time.sleep(delay)
+        try:
+            return request.execute()  # type: ignore[union-attr]
+        except HttpError as e:
+            is_rate_limit = e.resp.status in (429, 403) and (
+                "rateLimitExceeded" in str(e) or "userRateLimitExceeded" in str(e)
+            )
+            if is_rate_limit and delay < _BACKOFF_DELAYS[-1]:
+                continue
+            raise
+    raise RuntimeError("unreachable")  # pragma: no cover
 
 
 def collect_message_ids(
@@ -24,7 +49,7 @@ def collect_message_ids(
         if page_token:
             params["pageToken"] = page_token
 
-        result = service.users().messages().list(**params).execute()
+        result = execute_with_backoff(service.users().messages().list(**params))
         messages = result.get("messages", [])
         ids.extend(msg["id"] for msg in messages)
 
@@ -49,9 +74,9 @@ def batch_delete(
 
     for i in range(0, total, BATCH_CHUNK_SIZE):
         chunk = message_ids[i : i + BATCH_CHUNK_SIZE]
-        service.users().messages().batchDelete(
-            userId="me", body={"ids": chunk}
-        ).execute()
+        execute_with_backoff(
+            service.users().messages().batchDelete(userId="me", body={"ids": chunk})
+        )
         deleted += len(chunk)
         if progress_callback:
             progress_callback(deleted, total)
@@ -77,9 +102,11 @@ def batch_modify(
 
     for i in range(0, total, BATCH_CHUNK_SIZE):
         chunk = message_ids[i : i + BATCH_CHUNK_SIZE]
-        service.users().messages().batchModify(
-            userId="me", body={"ids": chunk, **body}
-        ).execute()
+        execute_with_backoff(
+            service.users()
+            .messages()
+            .batchModify(userId="me", body={"ids": chunk, **body})
+        )
         modified += len(chunk)
         if progress_callback:
             progress_callback(modified, total)
