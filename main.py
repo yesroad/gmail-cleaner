@@ -166,6 +166,30 @@ def flow_label(service) -> None:
     print_result(action, done)
 
 
+def flow_delete_empty_labels(service) -> None:
+    cleaner = LabelCleaner(service, "")
+    print_info("빈 라벨 검색 중...")
+    empty_labels = cleaner.get_empty_labels()
+
+    if not empty_labels:
+        print_warning("빈 라벨이 없습니다.")
+        return
+
+    print_count("빈 라벨", len(empty_labels))
+    selected = menu.select_labels_to_delete(empty_labels)
+
+    if not selected:
+        print_warning("선택된 라벨 없음")
+        return
+
+    if not menu.confirm(f"{len(selected)}개 라벨을 삭제할까요?"):
+        return
+
+    with progress_bar("라벨 삭제 중", total=len(selected)) as update:
+        deleted = cleaner.delete_labels(selected, progress_callback=update)
+    print_result("라벨 삭제", deleted)
+
+
 def flow_auto_label(service, **_) -> None:
     cleaner = AutoLabelCleaner(service)
     print_info("받은편지함 메시지 ID 수집 중...")
@@ -210,6 +234,7 @@ TASK_FLOWS = {
     "N일 이상 오래된 메일 삭제": flow_old_mail,
     "N MB 이상 대용량 메일 삭제": flow_large_mail,
     "라벨 기준 정리": flow_label,
+    "빈 라벨 삭제": flow_delete_empty_labels,
     "자동 라벨 분류": flow_auto_label,
 }
 
@@ -322,9 +347,15 @@ def main() -> None:
             break
 
 
-def headless_auto_label(service) -> None:
+def headless_auto_label(service, *, reset: bool = False) -> None:
     """비대화형 자동 라벨 분류 — 모든 매칭 라벨 자동 적용"""
     cleaner = AutoLabelCleaner(service)
+
+    if reset:
+        print_info("기존 자동 분류 라벨 제거 중...")
+        removed = cleaner.reset_labels()
+        print_result("라벨 제거", removed)
+
     print_info("받은편지함 메시지 ID 수집 중...")
     msg_ids = cleaner.fetch_message_ids()
     print_count("분석 대상", len(msg_ids))
@@ -367,7 +398,9 @@ def headless_cleanup(service, categories: list[str]) -> None:
     print_result("삭제", deleted)
 
 
-def run_headless(email: str, task: str, categories: list[str]) -> None:
+def run_headless(
+    email: str, task: str, categories: list[str], reset: bool = False
+) -> None:
     """GitHub Actions 등 비대화형 환경 진입점"""
     print_header(f"Gmail Cleaner [headless] — {email}")
     try:
@@ -379,7 +412,7 @@ def run_headless(email: str, task: str, categories: list[str]) -> None:
 
     try:
         if task == "auto-label":
-            headless_auto_label(service)
+            headless_auto_label(service, reset=reset)
         elif task == "cleanup":
             headless_cleanup(service, categories)
     except Exception as e:
@@ -388,11 +421,11 @@ def run_headless(email: str, task: str, categories: list[str]) -> None:
 
 
 CATEGORY_ALIASES: dict[str, str] = {
-    "spam":       "스팸 (SPAM)",
+    "spam": "스팸 (SPAM)",
     "promotions": "프로모션",
-    "social":     "소셜",
-    "updates":    "업데이트",
-    "trash":      "휴지통 (TRASH)",
+    "social": "소셜",
+    "updates": "업데이트",
+    "trash": "휴지통 (TRASH)",
 }
 
 
@@ -407,6 +440,11 @@ if __name__ == "__main__":
         default=["spam", "promotions"],
         help="삭제할 카테고리 (cleanup 전용): spam promotions social updates trash",
     )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="auto-label 실행 전 기존 자동 분류 라벨을 모두 제거",
+    )
     args = parser.parse_args()
 
     if args.headless:
@@ -414,7 +452,7 @@ if __name__ == "__main__":
             print("--headless 모드에는 --email과 --task가 필요합니다.")
             sys.exit(1)
         resolved = [CATEGORY_ALIASES.get(c, c) for c in args.categories]
-        run_headless(args.email, args.task, resolved)
+        run_headless(args.email, args.task, resolved, reset=args.reset)
     else:
         try:
             main()

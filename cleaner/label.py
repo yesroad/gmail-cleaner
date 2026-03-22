@@ -2,7 +2,12 @@
 
 from typing import Callable
 from .base import BaseCleaner
-from utils.batch import collect_message_ids, batch_delete, batch_modify
+from utils.batch import (
+    collect_message_ids,
+    batch_delete,
+    batch_modify,
+    execute_with_backoff,
+)
 from utils.query_builder import in_label
 
 
@@ -18,6 +23,35 @@ class LabelCleaner(BaseCleaner):
         labels = result.get("labels", [])
         # 시스템 라벨 제외
         return [l for l in labels if l["type"] == "user"]
+
+    def get_empty_labels(self) -> list[dict]:
+        """메일이 0건인 사용자 정의 라벨 목록 반환"""
+        labels = self.get_labels()
+        empty: list[dict] = []
+        for label in labels:
+            detail = execute_with_backoff(
+                self.service.users().labels().get(userId="me", id=label["id"])
+            )
+            if detail.get("messagesTotal", 0) == 0:
+                empty.append(label)
+        return empty
+
+    def delete_labels(
+        self,
+        labels: list[dict],
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> int:
+        """라벨 자체를 삭제한다. 삭제된 건수를 반환."""
+        total = len(labels)
+        deleted = 0
+        for idx, label in enumerate(labels):
+            execute_with_backoff(
+                self.service.users().labels().delete(userId="me", id=label["id"])
+            )
+            deleted += 1
+            if progress_callback:
+                progress_callback(idx + 1, total)
+        return deleted
 
     def _collect_ids(self) -> list[str]:
         return collect_message_ids(self.service, self._query)

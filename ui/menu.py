@@ -3,14 +3,16 @@
 import questionary
 from questionary import Style
 
-MENU_STYLE = Style([
-    ("qmark", "fg:#00bcd4 bold"),
-    ("question", "bold"),
-    ("answer", "fg:#00bcd4 bold"),
-    ("pointer", "fg:#00bcd4 bold"),
-    ("highlighted", "fg:#00bcd4 bold"),
-    ("selected", "fg:#00bcd4"),
-])
+MENU_STYLE = Style(
+    [
+        ("qmark", "fg:#00bcd4 bold"),
+        ("question", "bold"),
+        ("answer", "fg:#00bcd4 bold"),
+        ("pointer", "fg:#00bcd4 bold"),
+        ("highlighted", "fg:#00bcd4 bold"),
+        ("selected", "fg:#00bcd4"),
+    ]
+)
 
 TASK_CHOICES = [
     "스팸/프로모션/소셜/업데이트/휴지통 비우기",
@@ -19,6 +21,7 @@ TASK_CHOICES = [
     "N일 이상 오래된 메일 삭제",
     "N MB 이상 대용량 메일 삭제",
     "라벨 기준 정리",
+    "빈 라벨 삭제",
     "자동 라벨 분류",
     "─────────────────",
     "다른 계정으로 전환",
@@ -83,11 +86,14 @@ def select_task() -> str | None:
 
 def select_categories(available: list[str]) -> list[str]:
     """비울 카테고리 다중 선택"""
-    return questionary.checkbox(
-        "비울 카테고리를 선택하세요 (스페이스바로 선택):",
-        choices=available,
-        style=MENU_STYLE,
-    ).ask() or []
+    return (
+        questionary.checkbox(
+            "비울 카테고리를 선택하세요 (스페이스바로 선택):",
+            choices=available,
+            style=MENU_STYLE,
+        ).ask()
+        or []
+    )
 
 
 def input_sender_email() -> str | None:
@@ -171,6 +177,19 @@ def select_labels_for_apply(label_counts: dict[str, int]) -> list[str]:
         return []
     selected = questionary.checkbox(
         "적용할 라벨을 선택하세요 (스페이스바로 선택/해제):",
+        choices=choices,
+        style=MENU_STYLE,
+    ).ask()
+    return selected or []
+
+
+def select_labels_to_delete(labels: list[dict]) -> list[dict]:
+    """삭제할 빈 라벨 다중 선택"""
+    choices = [
+        {"name": label["name"], "value": label, "checked": True} for label in labels
+    ]
+    selected = questionary.checkbox(
+        "삭제할 라벨을 선택하세요 (스페이스바로 선택/해제):",
         choices=choices,
         style=MENU_STYLE,
     ).ask()
