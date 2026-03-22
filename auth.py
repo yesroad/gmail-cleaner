@@ -1,6 +1,5 @@
 """Gmail OAuth 인증 모듈 - 다중 계정 지원"""
 
-import os
 import json
 from pathlib import Path
 from google.auth.transport.requests import Request
@@ -86,9 +85,7 @@ def authenticate_new_account() -> tuple[any, str]:
     TOKENS_DIR.mkdir(exist_ok=True)
 
     if not CREDENTIALS_FILE.exists():
-        raise FileNotFoundError(
-            f"[오류] credentials.json 파일이 없습니다."
-        )
+        raise FileNotFoundError("[오류] credentials.json 파일이 없습니다.")
 
     flow = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS_FILE), SCOPES)
     creds = flow.run_local_server(port=0)
@@ -125,7 +122,7 @@ def list_authenticated_accounts() -> list[str]:
                 accounts.append(data["email"])
         else:
             # meta 파일 없을 경우 파일명에서 복원 시도
-            raw = token_path.stem[len("token_"):]
+            raw = token_path.stem[len("token_") :]
             if "_at_" in raw:
                 local, domain_raw = raw.split("_at_", 1)
                 domain = domain_raw.replace("_", ".")

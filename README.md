@@ -12,21 +12,28 @@ Gmail 계정을 대화형 CLI로 정리하는 Python 도구. 다중 계정을 �
 | 오래된 메일 삭제 | N일 이상 된 메일 삭제 |
 | 대용량 메일 삭제 | N MB 이상 메일 선택 삭제 |
 | 라벨 기준 정리 | 특정 라벨 메일 삭제·아카이브·읽음 처리 |
+| 빈 라벨 삭제 | 메일이 없는 라벨 일괄 삭제 |
 | **자동 라벨 분류** | 받은편지함을 분석해 카테고리별 라벨 자동 적용 |
 
 ### 자동 라벨 분류 규칙
 
-받은편지함 최대 500건을 분석해 아래 라벨을 자동 생성합니다.
+받은편지함 **전체**를 분석해 아래 라벨을 자동 생성합니다. 발신자 도메인 정확 매칭(100점) → Gmail 카테고리(70점) → 발신자 키워드(50점) → 제목 키워드(30점) 순서로 점수를 합산해 가장 높은 규칙으로 분류합니다.
 
 | 라벨 | 분류 기준 |
 |------|-----------|
-| 구매/배송 | 쿠팡·배민·지마켓 등 발신자, 주문·배송·택배 등 제목 키워드 |
-| 금융/결제 | 신한·KB·하나 등 카드사, 청구서·이체·카드대금 등 제목 키워드 |
-| 인증/보안 | 인증번호·OTP·verification 등 제목 키워드 |
-| 뉴스레터 | 프로모션 탭, noreply·newsletter 발신자 |
-| 소셜 | 소셜 탭, Facebook·Instagram·Discord 등 발신자 |
-| 업데이트/알림 | 업데이트 탭, 공지사항·서비스 알림 제목 키워드 |
-| 도메인/{domain} | 위 규칙에 미매칭 → 발신자 도메인으로 자동 분류 |
+| 인증/보안 | 인증번호·OTP·비밀번호 재설정·새로운 로그인 등 제목 키워드 |
+| 구매/배송 | coupang.co.kr·baemin.kr·amazon.com 등 도메인, 주문·배송·택배 등 제목 키워드 |
+| 금융/결제 | shinhan.com·kbcard.com·kakaobank.com 등 도메인, 청구서·이체·카드대금 등 제목 키워드 |
+| 여행/항공 | koreanair.com·airbnb.com·booking.com 등 도메인, 항공권·예약·숙박 등 제목 키워드 |
+| 구독/멤버십 | netflix.com·spotify.com·notion.so 등 도메인, 구독·갱신·subscription 등 제목 키워드 |
+| 채용/커리어 | wanted.co.kr·linkedin.com·programmers.co.kr 등 도메인, 채용·합격·면접 등 제목 키워드 |
+| 의료/건강 | nhis.or.kr·nps.or.kr 도메인, 진료·건강검진·처방 등 제목 키워드 |
+| 공공/행정 | nts.go.kr·hometax.go.kr 등 도메인, 고지서·세금·민원 등 제목 키워드 |
+| 교육 | inflearn.com·udemy.com·coursera.org 등 도메인, 강의·수료·certificate 등 제목 키워드 |
+| 뉴스레터 | 프로모션 탭, mailchimp.com·substack.com·stibee.com 등 도메인 |
+| 소셜 | 소셜 탭, facebookmail.com·discord.com 등 도메인 |
+| 업데이트/알림 | 업데이트 탭, 공지사항·점검·출시 등 제목 키워드 |
+| 기타 | 위 규칙에 미매칭 |
 
 ---
 
@@ -61,8 +68,8 @@ python3 main.py
 
 | 워크플로우 | 주기 | 작업 |
 |-----------|------|------|
-| `auto-label.yml` | 3일마다 (한국 오전 11시) | 자동 라벨 분류 |
-| `cleanup.yml` | 매주 일요일 (한국 오전 11시) | 스팸·프로모션 삭제 |
+| `auto-label.yml` | 매주 일요일 (한국 오전 11시) | 자동 라벨 분류 |
+| `cleanup.yml` | 매월 1일 (한국 오전 11시) | 스팸·프로모션 삭제 |
 
 ### 설정 방법
 
@@ -122,8 +129,8 @@ gmail-cleaner/
 │   ├── query_builder.py     # Gmail 쿼리 문자열 생성
 │   └── batch.py             # Gmail API 배치 처리
 ├── .github/workflows/
-│   ├── auto-label.yml       # 3일마다 자동 라벨 분류
-│   └── cleanup.yml          # 매주 불필요한 메일 삭제
+│   ├── auto-label.yml       # 매주 자동 라벨 분류
+│   └── cleanup.yml          # 매월 불필요한 메일 삭제
 ├── scripts/
 │   └── export_secrets.sh    # GitHub Secrets 설정 헬퍼
 └── requirements.txt
@@ -139,6 +146,9 @@ GitHub Actions 또는 스크립트에서 직접 실행할 때 사용합니다.
 # 자동 라벨 분류
 python3 main.py --headless --task auto-label --email user@gmail.com
 
+# 기존 라벨 초기화 후 재분류 (규칙 변경 시 권장)
+python3 main.py --headless --task auto-label --reset --email user@gmail.com
+
 # 스팸/프로모션 삭제
 python3 main.py --headless --task cleanup --email user@gmail.com
 
@@ -151,5 +161,5 @@ python3 main.py --headless --task cleanup --email user@gmail.com \
 
 ## 보안 주의사항
 
-- `credentials.json`, `token_*.json` 파일은 `.gitignore`에 등록되어 있습니다. **절대 커밋하지 마세요.**
+- `credentials/`, `tokens/` 디렉토리는 `.gitignore`에 등록되어 있습니다. **절대 커밋하지 마세요.**
 - OAuth 스코프: `https://mail.google.com/` (읽기·수정·삭제 권한 포함)

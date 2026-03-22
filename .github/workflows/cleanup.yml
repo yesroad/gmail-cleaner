@@ -1,8 +1,8 @@
-name: 불필요한 메일 삭제 (매주)
+name: 불필요한 메일 삭제 (매월)
 
 on:
   schedule:
-    - cron: "0 2 * * 0"   # 매주 일요일 UTC 02:00 (한국 11:00)
+    - cron: "0 2 1 * *"   # 매월 1일 UTC 02:00 (한국 11:00)
   workflow_dispatch:
     inputs:
       categories:

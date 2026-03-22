@@ -29,18 +29,27 @@ class LargeMailCleaner(BaseCleaner):
                 msg = (
                     self.service.users()
                     .messages()
-                    .get(userId="me", id=msg_id, format="metadata",
-                         metadataHeaders=["Subject", "From"])
+                    .get(
+                        userId="me",
+                        id=msg_id,
+                        format="metadata",
+                        metadataHeaders=["Subject", "From"],
+                    )
                     .execute()
                 )
-                headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+                headers = {
+                    h["name"]: h["value"]
+                    for h in msg.get("payload", {}).get("headers", [])
+                }
                 size_mb = msg.get("sizeEstimate", 0) / MB
-                messages.append({
-                    "id": msg_id,
-                    "subject": headers.get("Subject", "(제목 없음)"),
-                    "from": headers.get("From", "(발신자 없음)"),
-                    "size_mb": round(size_mb, 2),
-                })
+                messages.append(
+                    {
+                        "id": msg_id,
+                        "subject": headers.get("Subject", "(제목 없음)"),
+                        "from": headers.get("From", "(발신자 없음)"),
+                        "size_mb": round(size_mb, 2),
+                    }
+                )
             except Exception:
                 pass
         return sorted(messages, key=lambda x: x["size_mb"], reverse=True)

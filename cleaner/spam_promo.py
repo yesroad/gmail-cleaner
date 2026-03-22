@@ -3,7 +3,6 @@
 from typing import Callable
 from .base import BaseCleaner
 from utils.batch import collect_message_ids, batch_delete
-from utils.query_builder import combine, in_category
 
 
 CATEGORY_QUERIES = {
@@ -19,7 +18,9 @@ class SpamPromoCleaner(BaseCleaner):
     def __init__(self, service, categories: list[str]):
         super().__init__(service)
         self.categories = categories
-        self._queries = [CATEGORY_QUERIES[c] for c in categories if c in CATEGORY_QUERIES]
+        self._queries = [
+            CATEGORY_QUERIES[c] for c in categories if c in CATEGORY_QUERIES
+        ]
 
     def _collect_ids(self) -> list[str]:
         ids = []

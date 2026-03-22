@@ -1,8 +1,8 @@
-name: 자동 라벨 분류 (3일마다)
+name: 자동 라벨 분류 (매주)
 
 on:
   schedule:
-    - cron: "0 2 */3 * *"   # 3일마다 UTC 02:00 (한국 11:00)
+    - cron: "0 2 * * 0"   # 매주 일요일 UTC 02:00 (한국 11:00)
   workflow_dispatch:          # 수동 실행 버튼
 
 jobs:

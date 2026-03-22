@@ -1,7 +1,13 @@
 """rich Progress Bar 래퍼"""
 
 from contextlib import contextmanager
-from rich.progress import Progress, SpinnerColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    BarColumn,
+    TaskProgressColumn,
+    TimeElapsedColumn,
+)
 from ui.console import console
 
 

@@ -26,8 +26,12 @@ class BaseCleaner(ABC):
             msg = (
                 self.service.users()
                 .messages()
-                .get(userId="me", id=message_id, format="metadata",
-                     metadataHeaders=["Subject"])
+                .get(
+                    userId="me",
+                    id=message_id,
+                    format="metadata",
+                    metadataHeaders=["Subject"],
+                )
                 .execute()
             )
             headers = msg.get("payload", {}).get("headers", [])
